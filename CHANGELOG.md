@@ -4,6 +4,11 @@ Notable changes per release. Versions follow [semantic versioning](https://semve
 
 ## Unreleased
 
+- `PackSet(..., random_access=True)` (and `LocalSource(..., random_access=True)`) advises each local shard
+  descriptor `POSIX_FADV_RANDOM` when it opens: no kernel readahead, so a small read at a random place fetches what
+  it asks for. Video decoders reading 4 s training windows from a CephFS pack (8 MiB readahead) moved 0.66 MB per
+  window with it, 5.12 MB without.
+
 ## 0.2.0
 
 - **Breaking:** a `PackSet` validates each member's local header on the member's first read, on local paths as on

@@ -113,3 +113,27 @@ def test_views_are_independent(packed):
         assert one.read(4) == data[50:54]
         one.close()
         two.close()
+
+
+@pytest.mark.skipif(not hasattr(os, "posix_fadvise"), reason="no posix_fadvise")
+def test_random_access_advises_each_shard_descriptor_once(packed, monkeypatch):
+    """random_access=True: every shard descriptor is advised POSIX_FADV_RANDOM when it opens (also in a pickled
+    copy, as a spawned worker gets it); the default leaves readahead alone."""
+    import pickle
+
+    pack_dir, payloads, refs = packed
+    advised = []
+    monkeypatch.setattr(os, "posix_fadvise", lambda fd, off, n, advice: advised.append(advice))
+    with PackSet(pack_dir) as packs:
+        assert packs.read(refs["a.bin"]) == payloads["a.bin"]
+    assert advised == []
+    with PackSet(pack_dir, random_access=True) as packs:
+        for _ in range(2):
+            assert packs.read(refs["a.bin"]) == payloads["a.bin"]
+        with packs.open(refs["nested/b.bin"]) as handle:
+            assert handle.read() == payloads["nested/b.bin"]
+        assert advised == [os.POSIX_FADV_RANDOM]
+        copy = pickle.loads(pickle.dumps(packs))
+    with copy:
+        assert copy.read(refs["a.bin"]) == payloads["a.bin"]
+    assert advised == [os.POSIX_FADV_RANDOM] * 2

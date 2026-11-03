@@ -324,6 +324,11 @@ class PackSet:
     trip each) and checks key uniqueness across shards. Neither verifies
     CRCs: ``blobpack verify`` is the at-rest integrity check.
 
+    ``random_access=True`` advises the kernel that reads of the shards are
+    random (no readahead): for members read in small pieces at random places,
+    such as training windows of videos on a network filesystem, which would
+    otherwise read megabytes ahead of every piece.
+
     ``ref_base`` is the pack directory's path as embedded in references
     (see PackWriter); references whose directory part does not match it are
     rejected rather than resolved to a same-named shard from some other
@@ -343,6 +348,7 @@ class PackSet:
         open_file_budget: int = DEFAULT_OPEN_FILE_BUDGET,
         storage_options: dict | None = None,
         validate_on_open: bool = False,
+        random_access: bool = False,
         _sources: list | None = None,
     ):
         if open_file_budget < 1:
@@ -355,7 +361,7 @@ class PackSet:
         else:
             from ._sources import LocalSource
 
-            sources = [LocalSource(path) for path in sorted(Path(location).glob(pattern))]
+            sources = [LocalSource(path, random_access=random_access) for path in sorted(Path(location).glob(pattern))]
         if not sources:
             raise BlobPackError(f"no {pattern} shards under {location}")
 
@@ -366,6 +372,7 @@ class PackSet:
         from ._sources import DescriptorPool
 
         self.open_file_budget = open_file_budget
+        self.random_access = random_access
         self._pool = DescriptorPool(open_file_budget)
         self._open_lock = threading.Lock()  # guards deferred shard opening; see _open_guard
         self._open_pid = os.getpid()
@@ -382,7 +389,7 @@ class PackSet:
         from ._sources import LocalSource, RangeSource
 
         if not isinstance(source, RangeSource):
-            source = LocalSource(source)
+            source = LocalSource(source, random_access=self.random_access)
         if isinstance(source, LocalSource):
             source.pool = self._pool
         return PackFile(source, **kwargs)

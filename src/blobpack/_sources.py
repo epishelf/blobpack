@@ -140,11 +140,16 @@ class LocalSource(RangeSource):
     process changes. After fork, close the child's inherited descriptor
     copy before reopening; this does not close the parent's descriptor.
     Reads borrow the descriptor, so a pool can only reclaim idle shards.
+    ``random_access`` advises the kernel that reads are random
+    (``POSIX_FADV_RANDOM``): no readahead, so a read fetches what it asks
+    for. Network filesystems otherwise read ahead megabytes past every
+    small read of a member (CephFS: 8 MiB).
     """
 
-    def __init__(self, path: os.PathLike | str, *, pool=None):
+    def __init__(self, path: os.PathLike | str, *, pool=None, random_access: bool = False):
         self.path = os.fspath(path)
         self.pool = pool
+        self.random_access = random_access
         self._fd = -1
         self._pid = os.getpid()
         self._inflight = 0
@@ -167,6 +172,8 @@ class LocalSource(RangeSource):
     def _ensure_fd(self) -> int:
         if self._fd < 0:
             self._fd = os.open(self.path, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+            if self.random_access and hasattr(os, "posix_fadvise"):
+                os.posix_fadvise(self._fd, 0, 0, os.POSIX_FADV_RANDOM)
         return self._fd
 
     def _acquire(self) -> int:
@@ -229,10 +236,10 @@ class LocalSource(RangeSource):
                 self._fd = -1
 
     def __getstate__(self) -> dict:
-        return {"path": self.path, "pool": self.pool}
+        return {"path": self.path, "pool": self.pool, "random_access": self.random_access}
 
     def __setstate__(self, state: dict) -> None:
-        self.__init__(state["path"], pool=state["pool"])
+        self.__init__(state["path"], pool=state["pool"], random_access=state.get("random_access", False))
 
 
 class _TailStream(io.RawIOBase):
