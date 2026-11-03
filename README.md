@@ -199,6 +199,15 @@ process opens only the shards it reads.
 packs.read("zip://images/0000.jpg::media/pack-0000.zip")  # opens pack-0000.zip alone
 ```
 
+### Small reads at random places
+
+A decoder that reads a member in small pieces at random places (a training
+window of a video) pays for the kernel's readahead: on a network filesystem a
+128 KiB read can pull megabytes past it (CephFS reads up to 8 MiB ahead).
+`PackSet(..., random_access=True)` advises every local shard descriptor
+`POSIX_FADV_RANDOM`, so a read fetches what it asks for. Whole-member reads
+(`PackSet.read`) gain nothing from it.
+
 ### Object storage
 
 Packs work unchanged on anything fsspec speaks: the index builds from
