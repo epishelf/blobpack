@@ -10,6 +10,8 @@ Notable changes per release. Versions follow [semantic versioning](https://semve
   descriptor `POSIX_FADV_RANDOM` when it opens: no kernel readahead, so a small read at a random place fetches what
   it asks for. Video decoders reading 4 s training windows from a CephFS pack (8 MiB readahead) moved 0.66 MB per
   window with it, 5.12 MB without.
+- `blobpack ls | head` exits 0 when the reader hangs up after the last write: the CLI flushes stdout before it
+  returns, so the EPIPE is handled there instead of at interpreter exit (exit code 120).
 
 ## 0.2.0
 

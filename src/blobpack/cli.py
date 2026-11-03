@@ -362,7 +362,9 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     try:
-        return args.func(args)
+        code = args.func(args)
+        sys.stdout.flush()  # a hang-up after the last write surfaces here, not at interpreter exit
+        return code
     except BlobPackError as exc:  # a user-facing condition, not a crash
         print(f"error: {exc}", file=sys.stderr)
         return 1
