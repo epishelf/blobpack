@@ -4,6 +4,8 @@ Notable changes per release. Versions follow [semantic versioning](https://semve
 
 ## Unreleased
 
+## 0.2.1
+
 - `PackSet(..., random_access=True)` (and `LocalSource(..., random_access=True)`) advises each local shard
   descriptor `POSIX_FADV_RANDOM` when it opens: no kernel readahead, so a small read at a random place fetches what
   it asks for. Video decoders reading 4 s training windows from a CephFS pack (8 MiB readahead) moved 0.66 MB per
